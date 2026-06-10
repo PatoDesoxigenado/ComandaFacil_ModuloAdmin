@@ -376,7 +376,7 @@ async def seed() -> None:
         # In the frontend, the order_id for Table 2 is 2, Table 3 is 3, Table 4 is 4
 
         # Mesa 2 (OPEN)
-        order_m2 = OrderFormORM(id=2, tenant_id="1", state="OPEN", table_number=2, fulfillment_type="TABLE")
+        order_m2 = OrderFormORM(id=2, tenant_id="1", display_code="CMD-02", state="OPEN", table_number=2, fulfillment_type="TABLE")
         db.add(order_m2)
         await db.flush()
 
@@ -389,7 +389,7 @@ async def seed() -> None:
         await db.flush()
 
         # Mesa 3 (OPEN)
-        order_m3 = OrderFormORM(id=3, tenant_id="1", state="OPEN", table_number=3, fulfillment_type="TABLE")
+        order_m3 = OrderFormORM(id=3, tenant_id="1", display_code="CMD-03", state="OPEN", table_number=3, fulfillment_type="TABLE")
         db.add(order_m3)
         await db.flush()
 
@@ -400,7 +400,7 @@ async def seed() -> None:
         await db.flush()
 
         # Mesa 4 (PAYMENT_REQUESTED)
-        order_m4 = OrderFormORM(id=4, tenant_id="1", state="OPEN", table_number=4, fulfillment_type="TABLE", payment_requested=True)
+        order_m4 = OrderFormORM(id=4, tenant_id="1", display_code="CMD-04", state="OPEN", table_number=4, fulfillment_type="TABLE", payment_requested=True)
         db.add(order_m4)
         await db.flush()
 
@@ -562,6 +562,7 @@ async def seed() -> None:
             order_hist = OrderFormORM(
                 id=order_seq,
                 tenant_id="1",
+                display_code=f"CMD-H{order_seq}", # Adicionamos o display_code dinâmico aqui
                 state="CLOSED",
                 table_number=(i % 10) + 5,
                 fulfillment_type="TABLE"
