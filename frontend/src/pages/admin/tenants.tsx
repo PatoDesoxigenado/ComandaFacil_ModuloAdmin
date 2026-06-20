@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Building, Download, Layers, Plus, Trash2 } from 'lucide-react'
+import { BarChart3, Building, Download, Edit2, Layers, Plus, Trash2 } from 'lucide-react'
 import type React from 'react'
 import { useState } from 'react'
 import {
@@ -8,7 +8,9 @@ import {
   exportAnalytics,
   getTenants,
   type Tenant,
+  updateTenant,
 } from '@/features/admin/adminService'
+import TenantAnalyticsDashboard from '@/features/admin/TenantAnalyticsDashboard'
 
 export const AdminTenantsPage: React.FC = () => {
   const queryClient = useQueryClient()
@@ -16,6 +18,15 @@ export const AdminTenantsPage: React.FC = () => {
   const [newTenantName, setNewTenantName] = useState('')
   const [newTenantPlan, setNewTenantPlan] = useState<'BASIC' | 'PRO' | 'PLUS'>('BASIC')
   const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // Edit Tenant State
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPlan, setEditPlan] = useState<'BASIC' | 'PRO' | 'PLUS'>('BASIC')
+  const [editIsActive, setEditIsActive] = useState(true)
+
+  // Analytics View State
+  const [selectedTenantForAnalytics, setSelectedTenantForAnalytics] = useState<Tenant | null>(null)
 
   const createMutation = useMutation({
     mutationFn: createTenant,
@@ -30,6 +41,20 @@ export const AdminTenantsPage: React.FC = () => {
     mutationFn: deleteTenant,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number
+      data: { name?: string; plan_type?: 'BASIC' | 'PRO' | 'PLUS'; is_active?: boolean }
+    }) => updateTenant(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] })
+      setEditingTenant(null)
     },
   })
 
@@ -52,6 +77,29 @@ export const AdminTenantsPage: React.FC = () => {
     e.preventDefault()
     if (!newTenantName.trim()) return
     createMutation.mutate({ name: newTenantName, plan_type: newTenantPlan })
+  }
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingTenant) return
+    updateMutation.mutate({
+      id: editingTenant.id,
+      data: {
+        name: editName,
+        plan_type: editPlan,
+        is_active: editIsActive,
+      },
+    })
+  }
+
+  if (selectedTenantForAnalytics) {
+    return (
+      <TenantAnalyticsDashboard
+        tenantId={selectedTenantForAnalytics.id}
+        tenantName={selectedTenantForAnalytics.name}
+        onBack={() => setSelectedTenantForAnalytics(null)}
+      />
+    )
   }
 
   if (isLoading) {
@@ -147,6 +195,27 @@ export const AdminTenantsPage: React.FC = () => {
                     <td className="px-6 py-4 text-right">
                       <button
                         type="button"
+                        onClick={() => setSelectedTenantForAnalytics(t)}
+                        className="text-pink-400 hover:text-pink-300 hover:bg-pink-500/10 border border-transparent hover:border-pink-500/20 p-2 rounded-xl transition-all mr-2"
+                        title="Ver Dashboard de Analytics"
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTenant(t)
+                          setEditName(t.name)
+                          setEditPlan(t.plan_type)
+                          setEditIsActive(t.is_active)
+                        }}
+                        className="text-brand-400 hover:text-brand-300 hover:bg-brand-500/10 border border-transparent hover:border-brand-500/20 p-2 rounded-xl transition-all mr-2"
+                        title="Editar Franquia"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => {
                           if (window.confirm(`Deseja excluir a franquia "${t.name}"?`)) {
                             deleteMutation.mutate(t.id)
@@ -240,6 +309,94 @@ export const AdminTenantsPage: React.FC = () => {
                   className="bg-brand-500 hover:bg-brand-600 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-brand-500/20 transition-all disabled:opacity-50"
                 >
                   {createMutation.isPending ? 'Cadastrando...' : 'Cadastrar Unidade'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-gray-950 border border-gray-900 rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl">
+            <div>
+              <h3 className="text-lg font-black text-white">Editar Franquia</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Altere as informações da franquia de ID #{editingTenant.id}.
+              </p>
+            </div>
+
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="editTenantName"
+                  className="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                  Nome da Unidade
+                </label>
+                <input
+                  id="editTenantName"
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Ex: Barraca de Copacabana"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="editTenantPlan"
+                  className="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                  Plano de Assinatura
+                </label>
+                <select
+                  id="editTenantPlan"
+                  value={editPlan}
+                  onChange={(e) => setEditPlan(e.target.value as 'BASIC' | 'PRO' | 'PLUS')}
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500 transition-all"
+                >
+                  <option value="BASIC">BASIC (Rede Base)</option>
+                  <option value="PRO">PRO (Multi-KDS)</option>
+                  <option value="PLUS">PLUS (Faturamento Ilimitado)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="editTenantStatus"
+                  className="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                  Status da Franquia
+                </label>
+                <select
+                  id="editTenantStatus"
+                  value={editIsActive ? 'active' : 'inactive'}
+                  onChange={(e) => setEditIsActive(e.target.value === 'active')}
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500 transition-all"
+                >
+                  <option value="active">Ativa</option>
+                  <option value="inactive">Inativa</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTenant(null)}
+                  className="bg-gray-900 hover:bg-gray-850 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="bg-brand-500 hover:bg-brand-600 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-brand-500/20 transition-all disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>
             </form>

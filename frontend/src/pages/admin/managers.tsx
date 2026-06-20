@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Building, Key, Mail, Plus, Shield, Trash2 } from 'lucide-react'
+import { Building, Edit2, Key, Mail, Plus, Shield, Trash2 } from 'lucide-react'
 import type React from 'react'
 import { useState } from 'react'
 import {
@@ -9,6 +9,7 @@ import {
   getTenants,
   type Manager,
   type Tenant,
+  updateManager,
 } from '@/features/admin/adminService'
 
 interface ApiError {
@@ -36,6 +37,13 @@ export const AdminManagersPage: React.FC = () => {
   const [password, setPassword] = useState('')
   const [selectedTenantId, setSelectedTenantId] = useState<number | ''>('')
 
+  // Edit Manager State
+  const [editingManager, setEditingManager] = useState<Manager | null>(null)
+  const [editMgrName, setEditMgrName] = useState('')
+  const [editMgrEmail, setEditMgrEmail] = useState('')
+  const [editMgrTenantId, setEditMgrTenantId] = useState<number | ''>('')
+  const [editMgrIsActive, setEditMgrIsActive] = useState(true)
+
   const createMutation = useMutation({
     mutationFn: createManager,
     onSuccess: () => {
@@ -58,6 +66,23 @@ export const AdminManagersPage: React.FC = () => {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number
+      data: { name?: string; email?: string; tenant_id?: number; is_active?: boolean }
+    }) => updateManager(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['managers'] })
+      setEditingManager(null)
+    },
+    onError: (err: ApiError) => {
+      alert(err.response?.data?.detail || 'Erro ao atualizar gerente')
+    },
+  })
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !email.trim() || !password.trim() || selectedTenantId === '') return
@@ -66,6 +91,20 @@ export const AdminManagersPage: React.FC = () => {
       email,
       password,
       tenant_id: Number(selectedTenantId),
+    })
+  }
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingManager || editMgrTenantId === '') return
+    updateMutation.mutate({
+      id: editingManager.id,
+      data: {
+        name: editMgrName,
+        email: editMgrEmail,
+        tenant_id: Number(editMgrTenantId),
+        is_active: editMgrIsActive,
+      },
     })
   }
 
@@ -145,6 +184,20 @@ export const AdminManagersPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingManager(m)
+                          setEditMgrName(m.name)
+                          setEditMgrEmail(m.email)
+                          setEditMgrTenantId(m.tenant_id)
+                          setEditMgrIsActive(m.is_active)
+                        }}
+                        className="text-brand-400 hover:text-brand-300 hover:bg-brand-500/10 border border-transparent hover:border-brand-500/20 p-2 rounded-xl transition-all mr-2"
+                        title="Editar Gerente"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -284,6 +337,120 @@ export const AdminManagersPage: React.FC = () => {
                   className="bg-brand-500 hover:bg-brand-600 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-brand-500/20 transition-all disabled:opacity-50"
                 >
                   {createMutation.isPending ? 'Registrando...' : 'Registrar Gerente'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-gray-950 border border-gray-900 rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl">
+            <div>
+              <h3 className="text-lg font-black text-white">Editar Informações do Gerente</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Altere os dados do gerente de ID #{editingManager.id}.
+              </p>
+            </div>
+
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="editMgrName"
+                  className="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                  Nome Completo
+                </label>
+                <input
+                  id="editMgrName"
+                  type="text"
+                  required
+                  value={editMgrName}
+                  onChange={(e) => setEditMgrName(e.target.value)}
+                  placeholder="Nome do gerente"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="editMgrEmail"
+                  className="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                  E-mail Corporativo
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <input
+                    id="editMgrEmail"
+                    type="email"
+                    required
+                    value={editMgrEmail}
+                    onChange={(e) => setEditMgrEmail(e.target.value)}
+                    placeholder="email@comanda.com"
+                    className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="editMgrTenant"
+                  className="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                  Franquia Vinculada
+                </label>
+                <select
+                  id="editMgrTenant"
+                  required
+                  value={editMgrTenantId}
+                  onChange={(e) => setEditMgrTenantId(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500 transition-all"
+                >
+                  <option value="">Selecione uma Franquia...</option>
+                  {Array.isArray(tenants) &&
+                    tenants.map((t: Tenant) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} (ID: #{t.id})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="editMgrStatus"
+                  className="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                  Status do Gerente
+                </label>
+                <select
+                  id="editMgrStatus"
+                  value={editMgrIsActive ? 'active' : 'inactive'}
+                  onChange={(e) => setEditMgrIsActive(e.target.value === 'active')}
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500 transition-all"
+                >
+                  <option value="active">Ativo</option>
+                  <option value="inactive">Suspenso</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingManager(null)}
+                  className="bg-gray-900 hover:bg-gray-850 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="bg-brand-500 hover:bg-brand-600 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-brand-500/20 transition-all disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>
             </form>
