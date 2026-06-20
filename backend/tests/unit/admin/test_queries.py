@@ -78,14 +78,33 @@ async def test_handle_get_tenants_logs_query_and_results(caplog: pytest.LogCaptu
 async def test_handle_get_global_analytics_logs_query_and_results(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    aggregate_data = [{"_id": "tenant_1", "total_revenue": 500.0}]
+    aggregate_data = [
+        {
+            "_id": "1",
+            "revenue": 500.0,
+            "total_revenue": 500.0,
+            "sales_count": 1,
+            "grand_revenue": 500.0,
+            "grand_count": 1,
+        }
+    ]
     mongo_db = MockAsyncIOMotorDatabase(aggregate_data)
 
     query = GetGlobalAnalyticsQuery(limit=5, sort_by="revenue")
+    tenants = [Tenant(id=1, name="Test Tenant", plan_type=PlanType.BASIC)]
+    employee_counts = {"1": 3}
     with caplog.at_level(logging.INFO):
-        results = await handle_get_global_analytics(query, mongo_db)  # type: ignore
+        results = await handle_get_global_analytics(
+            query,
+            mongo_db,  # type: ignore
+            tenants,
+            employee_counts,
+        )
 
-    assert results == aggregate_data
+    assert results["overall_average_ticket"] == 500.0
+    assert len(results["tenants"]) == 1
+    assert results["tenants"][0]["name"] == "Test Tenant"
+    assert results["tenants"][0]["employee_count"] == 3
     assert any(
         "Executando consulta: GetGlobalAnalyticsQuery(limit=5, sort_by='revenue')" in record.message
         for record in caplog.records
@@ -94,4 +113,4 @@ async def test_handle_get_global_analytics_logs_query_and_results(
         "Resultado da consulta GetGlobalAnalyticsQuery:" in record.message
         for record in caplog.records
     )
-    assert any("tenant_1" in record.message for record in caplog.records)
+    assert any("Test Tenant" in record.message for record in caplog.records)

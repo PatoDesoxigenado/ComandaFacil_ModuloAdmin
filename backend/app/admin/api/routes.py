@@ -65,6 +65,23 @@ class CreateManagerSchema(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class UpdateTenantSchema(BaseModel):
+    name: str | None = None
+    plan_type: PlanType | None = None
+    is_active: bool | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+
+class UpdateManagerSchema(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    tenant_id: int | None = None
+    is_active: bool | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+
 @router.post("/tenants", response_model=TenantResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_tenant(
     command: CreateTenantCommand,
@@ -97,6 +114,35 @@ async def delete_tenant(
     command = DeleteTenantCommand(tenant_id=tenant_id)
     await handle_delete_tenant(command, repo)
     await db.commit()
+
+
+@router.patch(
+    "/tenants/{tenant_id}", response_model=TenantResponseSchema, status_code=status.HTTP_200_OK
+)
+async def update_tenant(
+    tenant_id: int,
+    schema: UpdateTenantSchema,
+    db: DbSession,
+    _: CurrentAdminEmployee,
+) -> Tenant:
+    repo = SQLAlchemyTenantRepository(db)
+    tenant = await repo.find_by_id(tenant_id)
+    if not tenant:
+        raise DomainException("Tenant not found", status_code=404)
+
+    if schema.name is not None:
+        tenant.name = schema.name
+    if schema.plan_type is not None:
+        tenant.plan_type = schema.plan_type
+    if schema.is_active is not None:
+        if schema.is_active:
+            tenant.activate()
+        else:
+            tenant.deactivate()
+
+    await repo.save(tenant)
+    await db.commit()
+    return tenant
 
 
 @router.get("/managers", response_model=list[ManagerResponseSchema], status_code=status.HTTP_200_OK)
@@ -214,15 +260,82 @@ async def delete_manager(
     await db.commit()
 
 
+@router.patch(
+    "/managers/{employee_id}", response_model=ManagerResponseSchema, status_code=status.HTTP_200_OK
+)
+async def update_manager(
+    employee_id: int,
+    schema: UpdateManagerSchema,
+    db: DbSession,
+    _: CurrentAdminEmployee,
+) -> dict[str, Any]:
+    emp_repo = SQLAlchemyEmployeeRepository(db)
+    tenant_repo = SQLAlchemyTenantRepository(db)
+
+    employee = await emp_repo.find_by_id(employee_id)
+    if not employee:
+        raise DomainException("Employee not found", status_code=404)
+
+    if schema.name is not None:
+        employee.name = schema.name
+    if schema.email is not None:
+        employee.email = Email(schema.email)
+
+    manager_role = next((r for r in employee.roles if r.role_type == RoleType.MANAGER), None)
+
+    if schema.tenant_id is not None:
+        new_tenant = await tenant_repo.find_by_id(schema.tenant_id)
+        if not new_tenant:
+            raise DomainException("New tenant not found", status_code=404)
+
+        if manager_role:
+            employee.roles = [r for r in employee.roles if r.role_type != RoleType.MANAGER]
+            employee.add_role(new_tenant, RoleType.MANAGER)
+        else:
+            employee.add_role(new_tenant, RoleType.MANAGER)
+
+    if schema.is_active is not None:
+        manager_role = next((r for r in employee.roles if r.role_type == RoleType.MANAGER), None)
+        if manager_role:
+            manager_role.is_active = schema.is_active
+
+    await emp_repo.save(employee)
+    await db.commit()
+
+    updated_role = next((r for r in employee.roles if r.role_type == RoleType.MANAGER), None)
+    return {
+        "id": employee.id,
+        "name": employee.name,
+        "email": str(employee.email),
+        "tenant_id": updated_role.tenant_id if updated_role else (schema.tenant_id or 0),
+        "is_active": updated_role.is_active if updated_role else True,
+    }
+
+
 @router.get("/analytics/global", status_code=status.HTTP_200_OK)
 async def get_global_analytics(
     mongo: MongoDB,
+    db: DbSession,
     _: CurrentAdminEmployee,
     limit: int = 5,
     sort: str = "revenue",
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
+    # 1. Fetch tenants
+    tenant_repo = SQLAlchemyTenantRepository(db)
+    tenants = await tenant_repo.find_all()
+
+    # 2. Fetch employee counts grouped by tenant_id
+    employee_count_stmt = (
+        select(UserTenantRoleORM.tenant_id, func.count(UserTenantRoleORM.employee_id).label("cnt"))
+        .where(UserTenantRoleORM.is_active)
+        .group_by(UserTenantRoleORM.tenant_id)
+    )
+    employee_count_res = await db.execute(employee_count_stmt)
+    employee_counts = {str(row.tenant_id): row.cnt for row in employee_count_res}
+
+    # 3. Handle query execution
     query = GetGlobalAnalyticsQuery(limit=limit, sort_by=sort)
-    return await handle_get_global_analytics(query, mongo)
+    return await handle_get_global_analytics(query, mongo, tenants, employee_counts)
 
 
 @router.get("/analytics/export")
