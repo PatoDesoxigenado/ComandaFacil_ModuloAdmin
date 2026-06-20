@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AdminDashboard as AdminDashboardPage } from '@/features/admin/AdminDashboard'
 import { useAuth } from '@/features/auth/auth_context'
 import { AdminManagersPage } from '@/pages/admin/managers'
+import { AdminReportsPage } from '@/pages/admin/reports'
 import { AdminRequestsPage } from '@/pages/admin/requests'
 import { AdminSuppliersPage } from '@/pages/admin/suppliers'
 import { AdminTenantsPage } from '@/pages/admin/tenants'
@@ -127,6 +128,17 @@ export default function App() {
           <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
             <Layout>
               <AdminRequestsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/reports"
+        element={
+          <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+            <Layout>
+              <AdminReportsPage />
             </Layout>
           </ProtectedRoute>
         }

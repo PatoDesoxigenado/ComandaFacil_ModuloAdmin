@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   ClipboardList,
   Coffee,
   Flame,
@@ -49,6 +50,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       label: 'Solicitações',
       path: '/admin/requests',
       icon: ClipboardList,
+      roles: ['SUPER_ADMIN'],
+    },
+    {
+      label: 'Relatórios',
+      path: '/admin/reports',
+      icon: BarChart3,
       roles: ['SUPER_ADMIN'],
     },
     // Tenant-specific items
