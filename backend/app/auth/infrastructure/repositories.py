@@ -49,6 +49,22 @@ class SQLAlchemyTenantRepository(TenantRepository):
             self._session.add(orm)
         await self._session.flush()
 
+    async def find_all(self) -> list[Tenant]:
+        stmt = select(TenantORM)
+        result = await self._session.execute(stmt)
+        orms = result.scalars().all()
+        return [
+            Tenant(
+                id=orm.id, name=orm.name, plan_type=PlanType(orm.plan_type), is_active=orm.is_active
+            )
+            for orm in orms
+        ]
+
+    async def delete(self, id: int) -> None:
+        stmt = delete(TenantORM).where(TenantORM.id == id)
+        await self._session.execute(stmt)
+        await self._session.flush()
+
 
 class SQLAlchemyEmployeeRepository(EmployeeRepository):
     """SQLAlchemy implementation of EmployeeRepository interface."""
@@ -106,7 +122,6 @@ class SQLAlchemyEmployeeRepository(EmployeeRepository):
         # Add roles ORM mappings
         for role in employee.roles:
             role_orm = UserTenantRoleORM(
-                id=role.id,
                 tenant_id=role.tenant_id,
                 employee_id=employee.id,
                 role_type=role.role_type.value,

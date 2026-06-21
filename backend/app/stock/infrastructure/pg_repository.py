@@ -83,15 +83,18 @@ class SQLAlchemyStockItemRepository:
             orm.type = item_type
             orm.unit = unit
         else:
-            orm = StockItemORM(
-                tenant_id=item.tenant_id,
-                name=item.name,
-                category=item.category,
-                type=item_type,
-                unit=unit,
-                min_stock_level=item.min_stock_level,
-                is_active=item.is_active,
-            )
+            kwargs = {
+                "tenant_id": item.tenant_id,
+                "name": item.name,
+                "category": item.category,
+                "type": item_type,
+                "unit": unit,
+                "min_stock_level": item.min_stock_level,
+                "is_active": item.is_active,
+            }
+            if item.id != 0:
+                kwargs["id"] = item.id
+            orm = StockItemORM(**kwargs)
             self._session.add(orm)
 
         await self._session.flush()

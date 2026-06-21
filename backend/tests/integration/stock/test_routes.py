@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-@pytest.fixture
+@pytest.fixture()
 async def sqlite_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
@@ -33,7 +33,7 @@ async def sqlite_session() -> AsyncGenerator[AsyncSession, None]:
     await engine.dispose()
 
 
-@pytest.fixture
+@pytest.fixture()
 async def api_client(sqlite_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     _store, mock_db = make_mock_db()
 
@@ -56,7 +56,7 @@ async def api_client(sqlite_session: AsyncSession) -> AsyncGenerator[AsyncClient
     app.dependency_overrides.clear()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_stock_item_endpoint_success(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -91,7 +91,7 @@ async def test_create_stock_item_endpoint_success(
     assert persisted.name == "Farinha de Trigo"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_stock_item_duplicate_name_returns_409(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -123,7 +123,7 @@ async def test_create_stock_item_duplicate_name_returns_409(
     assert response.status_code == 409
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_list_stock_items_endpoint(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -152,7 +152,7 @@ async def test_list_stock_items_endpoint(
     assert names == {"Arroz", "Feijão"}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_list_stock_items_low_stock_filter(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -193,7 +193,7 @@ async def test_list_stock_items_low_stock_filter(
     assert json_data[0]["is_low_stock"] is True
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_stock_item_endpoint(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -201,7 +201,6 @@ async def test_get_stock_item_endpoint(
     resp = await api_client.post(
         "/api/v1/stock/items",
         json={
-            "id": 30,
             "name": "Sal",
             "category": "RAW_MATERIAL",
             "current_quantity": 25.0,
@@ -209,18 +208,19 @@ async def test_get_stock_item_endpoint(
         },
     )
     assert resp.status_code == 201
+    created_id = resp.json()["id"]
 
     # Act
-    response = await api_client.get("/api/v1/stock/items/30")
+    response = await api_client.get(f"/api/v1/stock/items/{created_id}")
 
     # Assert
     assert response.status_code == 200
     json_data = response.json()
-    assert json_data["id"] == 30
+    assert json_data["id"] == created_id
     assert json_data["name"] == "Sal"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_stock_item_not_found_returns_404(api_client: AsyncClient) -> None:
     # Act
     response = await api_client.get("/api/v1/stock/items/999")
@@ -229,7 +229,7 @@ async def test_get_stock_item_not_found_returns_404(api_client: AsyncClient) -> 
     assert response.status_code == 404
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_add_stock_endpoint(api_client: AsyncClient, sqlite_session: AsyncSession) -> None:
     # Arrange
     repo = SQLAlchemyStockItemRepository(sqlite_session)
@@ -255,7 +255,7 @@ async def test_add_stock_endpoint(api_client: AsyncClient, sqlite_session: Async
     assert json_data["current_quantity_amount"] == 5.0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_deduct_stock_endpoint(api_client: AsyncClient, sqlite_session: AsyncSession) -> None:
     # Arrange
     repo = SQLAlchemyStockItemRepository(sqlite_session)
@@ -287,7 +287,7 @@ async def test_deduct_stock_endpoint(api_client: AsyncClient, sqlite_session: As
     assert json_data["current_quantity_amount"] == 15.0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_deduct_stock_insufficient_returns_422(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -319,7 +319,7 @@ async def test_deduct_stock_insufficient_returns_422(
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_set_min_stock_level_endpoint(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -347,7 +347,7 @@ async def test_set_min_stock_level_endpoint(
     assert json_data["min_stock_level"] == 20.0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_adjust_stock_endpoint(api_client: AsyncClient, sqlite_session: AsyncSession) -> None:
     # Arrange
     repo = SQLAlchemyStockItemRepository(sqlite_session)
@@ -373,7 +373,7 @@ async def test_adjust_stock_endpoint(api_client: AsyncClient, sqlite_session: As
     assert json_data["current_quantity_amount"] == 15.0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_stock_movements_endpoint(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:

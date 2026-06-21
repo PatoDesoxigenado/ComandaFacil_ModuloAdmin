@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-@pytest.fixture
+@pytest.fixture()
 async def sqlite_session() -> AsyncGenerator[AsyncSession, None]:
     """In-memory SQLite session with all database schemas generated."""
     from app.shared import database as _database
@@ -51,7 +51,7 @@ async def sqlite_session() -> AsyncGenerator[AsyncSession, None]:
     await engine.dispose()
 
 
-@pytest.fixture
+@pytest.fixture()
 async def api_client(sqlite_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """HTTP Client that overrides db_session to use our temporary SQLite db."""
 
@@ -78,7 +78,7 @@ async def api_client(sqlite_session: AsyncSession) -> AsyncGenerator[AsyncClient
     app.dependency_overrides.clear()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_kitchen_station_persistence_and_query_success(sqlite_session: AsyncSession) -> None:
     # Arrange
     repo = SQLAlchemyKitchenStationRepository(sqlite_session)
@@ -103,7 +103,7 @@ async def test_kitchen_station_persistence_and_query_success(sqlite_session: Asy
     assert bevs[0].is_active is False
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_kitchen_order_item_persistence_success(sqlite_session: AsyncSession) -> None:
     # Arrange
     repo = SQLAlchemyKitchenOrderItemRepository(sqlite_session)
@@ -132,7 +132,7 @@ async def test_kitchen_order_item_persistence_success(sqlite_session: AsyncSessi
     assert persisted_by_corr.id == 42
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_kds_http_lifecycle_endpoints_success(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
@@ -178,11 +178,30 @@ async def test_kds_http_lifecycle_endpoints_success(
     assert items_after[0]["state"] == "READY"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_kds_websocket_and_background_task_dispatch_flow_success(
     api_client: AsyncClient, sqlite_session: AsyncSession
 ) -> None:
-    # Arrange: Setup OrderForm
+    # Arrange: Setup OrderForm and MenuItem
+    from decimal import Decimal
+
+    from app.menu.domain.menu import MenuItem, PreparationProfile
+    from app.menu.infrastructure.repositories import SQLAlchemyMenuItemRepository
+    from app.shared.money import Money
+
+    item_repo = SQLAlchemyMenuItemRepository(sqlite_session)
+    menu_item = MenuItem(
+        id=10,
+        tenant_id="franquia_001",
+        name="Milkshake",
+        description="Delicioso",
+        base_price=Money(Decimal("18.50")),
+        station_type="BEVERAGE",
+        category_name="Sobremesas",
+        preparation_profile=PreparationProfile.STANDARD,
+    )
+    await item_repo.save(menu_item)
+
     order_repo = SQLAlchemyOrderRepository(sqlite_session)
     order = OrderForm(id=200, tenant_id="franquia_001")
     order.set_fulfillment_strategy(Table(12))
